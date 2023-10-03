@@ -1,0 +1,233 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Example of the Authorization Code flow with Spotify</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="help.css">
+
+    <style type="text/css">
+      #login, #loggedin {
+        display: none;
+      }
+      .text-overflow {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 500px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+       <!--<a href = "/test" class = "btn btn-primary">Test</a>-->
+      <div id="login">
+        <h1>Stats download test</h1>
+        <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+      </div>
+      <div id="loggedin">
+        <div id="user-profile">
+        </div>
+        <div id="oauth">
+        </div>
+          <ul id= "topArtist" class = "circle-container">
+          </ul>
+          <ul id = "topTracks"  class = "circle-container-large" >
+          </ul>
+        <div id= "topGenres" style=" float: right; padding: 15pt; display: none;">
+          <b><u>Top Genres</u></b><br>
+        </div>
+        <!--<button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button> -->
+      </div>
+    </div>
+
+    <script id="user-profile-template" type="text/x-handlebars-template">
+      <div class="media" style="padding:15pt;">
+        <div class="pull-left"> 
+          <img class="userLogo"  src="{{images.0.url}}" />
+        </div>
+        <div class="media-body">
+          <dl class="dl-horizontal">
+            <br>
+            <dt><button onclick="window.location.href = 'https://www.spotify.com/logout';  $('#login').show();
+            $('#loggedin').hide();">Logout</button></dt>
+          </dl>
+        </div>
+      </div>
+    </script>
+
+    <script id = "topArtistTemplate" type="text/x-handlebars-template"> 
+      <dl class="dl-horizontal">
+        <dt>Top Artist: </dt><dd>{{name}}</dd>
+      </dl>
+    </script>
+
+
+    <script id="oauth-template" type="text/x-handlebars-template">
+     <!-- <h2>oAuth info</h2>
+       <dl class="dl-horizontal">
+       <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd> 
+        <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+      </dl> -->
+    </script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+    <script>
+      (function() {
+
+        /**
+         * Obtains parameters from the hash of the URL
+         * @return Object
+         */
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+
+        var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+            userProfileTemplate = Handlebars.compile(userProfileSource),
+            userProfilePlaceholder = document.getElementById('user-profile');
+
+        var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+
+        var topArtistPlaceholder = document.getElementById("topArtist");
+        var topTrackPlaceholder = document.getElementById("topTracks");
+
+        var params = getHashParams();
+
+        var genre = {};
+
+        var access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error;
+
+        if (error) {
+          alert('There was an error during the authentication');
+        } else {
+          if (access_token) {
+            // render oauth info
+            oauthPlaceholder.innerHTML = oauthTemplate({
+              access_token: access_token,
+              refresh_token: refresh_token
+            });
+
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+                  console.log(response);
+
+                  $('#login').hide();
+                  $('#loggedin').show();
+                }
+            });
+
+            $.ajax(
+              {
+                url: 'https://api.spotify.com/v1/me/top/artists?time_range=short_term&limit=8&offset=0',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  console.log(response);
+                  for(var x=0;x!=response.items.length;x++)
+                  {
+                    for (var y = 0;y!=response.items[x].genres.length; y++)
+                    {
+                      if(Object.keys(genre).length <= 0 || Object.keys(genre).indexOf(response.items[x].genres[y]) < 0)
+                      {
+                        genre[response.items[x].genres[y]] = {"count":1};
+                      }
+                      else
+                      {
+                        genre[response.items[x].genres[y]].count += 1;
+                      }
+                    }
+                    topArtistPlaceholder.innerHTML += "<li><img  src = '"+response.items[x].images[0].url+"' ></img></li>";
+                  }
+                  console.log(genre);
+
+                  var sorted = [];
+
+                  for(var x=0;x!= Object.keys(genre).length;x++)
+                  {
+                    sorted.push([Object.keys(genre)[x],genre[Object.keys(genre)[x]].count]);
+                  }
+
+                  for(var x=1;x!= sorted.length;x++)
+                  {
+                    var itemToInsert = sorted[x];
+                    var previous = x-1;
+                    while(previous >= 0 && sorted[previous][1] < itemToInsert[1])
+                    {
+                      sorted[previous + 1] = sorted[previous];
+                      previous = previous - 1;
+                    }
+                    sorted[previous + 1] = itemToInsert;
+                  }
+                  var topGenresElement = document.getElementById("topGenres");
+                  for(var x = 0;x!= 10;x++)
+                  {
+                    topGenresElement.innerHTML += "<br>" + (x+1) +". <b>"+(sorted[x][0][0].toUpperCase() + sorted[x][0].substring(1))+"</b>";                    
+                  }
+                }
+              }
+            );
+
+            $.ajax(
+              {
+                url: 'https://api.spotify.com/v1/me/top/tracks?time_range=short_term&limit=16&offset=0',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  console.log(response);
+                  for(var x=0;x!=response.items.length;x++)
+                  {
+                    topTrackPlaceholder.innerHTML += "<li><img src = '"+response.items[x].album.images[0].url+"' w</img></li>";
+                  }
+                }
+              }
+            );
+           
+
+          } else {
+              // render initial screen
+              $('#login').show();
+              $('#loggedin').hide();
+          }
+
+
+
+          document.getElementById('obtain-new-token').addEventListener('click', function() {
+            $.ajax({
+              url: '/refresh_token',
+              data: {
+                'refresh_token': refresh_token
+              }
+            }).done(function(data) {
+              access_token = data.access_token;
+              oauthPlaceholder.innerHTML = oauthTemplate({
+                access_token: access_token,
+                refresh_token: refresh_token
+              });
+            });
+          }, false);
+
+        }
+      })();
+    </script>
+  </body>
+</html>
+
