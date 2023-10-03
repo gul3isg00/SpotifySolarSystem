@@ -1,7 +1,10 @@
 # SpotifySolarSystem
 A simple **express application** that looks at your Spotify statistics using the **Spotify API** and generates a solar system based around them.
+
 ![App](mySystem.gif)
-One running, simple log in with your Spotify account, and it will generate a simple but satisfying solar system based around your music taste.
+
+Once running, simple log in with your Spotify account, and it will generate a simple but satisfying solar system based around your music taste.
+
 ## Setup
 **The setup for this app is a little more complicated as it's designed to be accessed remotely from a server, instead of being downloaded and run locally, but if you do want to try this out for yourself, this is how you would go about it.**
 
